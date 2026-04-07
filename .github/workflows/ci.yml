@@ -40,12 +40,13 @@ jobs:
           output: 'trivy-report.txt'
 
       - name: Upload vulnerability logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vulnerability-reports
           path: |
             target/dependency-check-report.html
             trivy-report.txt
+
 
       - name: Count vulnerabilities
         run: |
