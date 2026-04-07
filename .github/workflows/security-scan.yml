@@ -62,10 +62,11 @@ jobs:
       - name: Run OWASP Dependency Check (Offline)
         run: |
           mvn org.owasp:dependency-check-maven:9.0.9:check \
-          -Ddependency-check.skipUpdate=true \
-          -Ddependency-check.autoUpdate=false \
-          -DfailOnError=false \
-          -Dformat=HTML
+            -f ./pom.xml \
+            -Ddependency-check.skipUpdate=true \
+            -Ddependency-check.autoUpdate=false \
+            -DfailOnError=false \
+            -Dformat=HTML
 
       - name: Debug - Find Report
         run: find . -name "dependency-check-report.html"
