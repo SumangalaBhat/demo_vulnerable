@@ -20,6 +20,13 @@
             <artifactId>spring-boot-starter-web</artifactId>
             <version>${spring-boot.version}</version>
         </dependency>
+
+<!-- Intentionally vulnerable dependency -->
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-collections4</artifactId>
+    <version>4.0</version> <!-- Known for deserialization vulnerabilities -->
+</dependency>
         <!-- Optional: Dev Tools for hot reload -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
