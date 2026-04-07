@@ -1,4 +1,4 @@
-name: Security Scan
+name: Java Microservice Security Scan
 
 on:
   push:
@@ -7,37 +7,55 @@ on:
     branches: [ main ]
 
 jobs:
-  scan:
+  security-scan:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      # 2. Set up Java 17
-      - name: Set up JDK 17
+      # Step 1: Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        # This clones your repository into the runner workspace
+
+      # Step 2: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
+        # Ensures Java 17 is installed and JAVA_HOME is configured for Maven and scanners
 
-      # 3. Build the project
+      # Step 3: Build the project using Maven
       - name: Build with Maven
         run: mvn clean install
+        # Compiles your microservice, downloads dependencies, ensures project is buildable
 
-      # 4. Run OWASP Dependency Check
-      - name: Run Dependency Check
+      # Step 4: Run OWASP Dependency Check
+      - name: Run Vulnerability Scan (Dependency Check)
         uses: dependency-check/Dependency-Check_Action@main
         with:
           project: 'simple-java-microservice'
-          path: '.'
-          format: 'HTML'
+          path: '.'                  # Scan entire project directory
+          format: 'HTML'             # Generate HTML report (also supports XML/CSV)
           out: 'dependency-check-reports'
+          docker: false              # Use runner's Java, avoids JAVA_HOME Docker issues
+        # This step scans all dependencies (like commons-collections4:4.0) for known vulnerabilities
 
-      # 5. Upload the vulnerability report
-      - name: Upload Report
+      # Step 5: Upload Vulnerability Report
+      - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: depcheck-report
           path: dependency-check-reports
+        # Uploads the HTML report as an artifact so DevOps teams can review it manually
+
+      # Step 6: Fail build on critical vulnerabilities (Optional)
+      - name: Fail on Critical Vulnerabilities
+        run: |
+          if grep -q "Critical" dependency-check-reports/dependency-check-report.html; then
+            echo "Critical vulnerabilities found. Failing the build."
+            exit 1
+          else
+            echo "No critical vulnerabilities found."
+          fi
+        # This simulates a traditional DevOps rule: block deployments if high-risk vulnerabilities exist
