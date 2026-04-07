@@ -1,58 +1,36 @@
-name: CI Pipeline with Security Scan
+name: Security Scan
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
-  build-and-scan:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
 
       - name: Build with Maven
-        run: mvn clean package
-        working-directory: ./service
+        run: mvn clean install
 
-      - name: Run OWASP Dependency-Check
-        run: mvn org.owasp:dependency-check-maven:check
-        working-directory: ./service
-        continue-on-error: true
-
-
-      - name: Build Docker image
-        run: docker build -t vulnerable-microservice .
-
-      - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
+      - name: Run OWASP Dependency Check
+        uses: OWASP/dependency-check-action@v2
         with:
-          image-ref: 'vulnerable-microservice'
-          format: 'table'
-          exit-code: '0'
-          output: 'trivy-report.txt'
+          scan-path: .
+          format: 'ALL'
+          project: 'java-microservice-vuln'
 
-      - name: Upload vulnerability logs
-        uses: actions/upload-artifact@v4
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v3
         with:
-          name: vulnerability-reports
-          path: |
-            target/dependency-check-report.html
-            trivy-report.txt
-
-
-      - name: Count vulnerabilities
-        run: |
-          echo "Dependency-Check Vulnerabilities:"
-          grep -c "<vulnerability>" target/dependency-check-report.html || true
-          echo "Trivy Vulnerabilities:"
-          grep -c "CRITICAL" trivy-report.txt || true
+          name: dependency-check-report
+          path: dependency-check-report.html
