@@ -1,0 +1,55 @@
+name: CI Pipeline with Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build with Maven
+        run: mvn clean package
+
+      - name: Run OWASP Dependency-Check
+        run: |
+          mvn org.owasp:dependency-check-maven:check
+        continue-on-error: true
+
+      - name: Build Docker image
+        run: docker build -t vulnerable-microservice .
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'vulnerable-microservice'
+          format: 'table'
+          exit-code: '0'
+          output: 'trivy-report.txt'
+
+      - name: Upload vulnerability logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: vulnerability-reports
+          path: |
+            target/dependency-check-report.html
+            trivy-report.txt
+
+      - name: Count vulnerabilities
+        run: |
+          echo "Dependency-Check Vulnerabilities:"
+          grep -c "<vulnerability>" target/dependency-check-report.html || true
+          echo "Trivy Vulnerabilities:"
+          grep -c "CRITICAL" trivy-report.txt || true
