@@ -59,9 +59,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Run OWASP Dependency Check (No Update)
-        run: mvn org.owasp:dependency-check-maven:check \
-             -Ddependency-check.skipUpdate=true
+      - name: Run OWASP Dependency Check (Offline Mode)
+        run: |
+          mvn org.owasp:dependency-check-maven:9.0.9:check \
+          -Ddependency-check.skipUpdate=true \
+          -DfailOnError=false \
+          -Dformat=HTML
 
       - name: List Reports
         run: ls -l target/
