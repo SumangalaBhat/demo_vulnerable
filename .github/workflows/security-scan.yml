@@ -65,14 +65,14 @@ jobs:
           -DfailOnError=false \
           -Dnvd.api.key=${{ secrets.NVD_API_KEY }}
           
-      - name: Debug - List target folder
-        run: ls -R target
-      
+             
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
-          path: target/dependency-check-report.html
+          path: |
+            target/dependency-check-report.html
+            target/site/dependency-check-report.html
 
 
   # =========================
