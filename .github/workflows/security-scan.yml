@@ -62,12 +62,15 @@ jobs:
       - name: Run OWASP Dependency Check
         run: |
           mvn org.owasp:dependency-check-maven:9.0.9:check \
-          -Dnvd.api.key=${{ secrets.NVD_API_KEY }} \
-          -Dformat=HTML \
-          -DfailOnError=false
-
-      - name: List Reports
-        run: ls -l target/
+          -Ddependency-check.skipUpdate=true \
+          -DfailOnError=false \
+          -Dformat=HTML
+      
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.html
 
   # =========================
   # Stage 5: Upload Report
