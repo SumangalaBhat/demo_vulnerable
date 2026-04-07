@@ -1,6 +1,5 @@
 name: Security Scan
 
-# Trigger on pushes and pull requests to main branch
 on:
   push:
     branches: [ main ]
@@ -8,37 +7,37 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-scan:
+  scan:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      # 1. Checkout the repository
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Step 2: Set up Java
+      # 2. Set up Java 17
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
 
-      # Step 3: Build the project using Maven
+      # 3. Build the project
       - name: Build with Maven
         run: mvn clean install
 
-      # Step 4: Run OWASP Dependency Check
-      - name: Run OWASP Dependency Check
-        uses: OWASP/dependency-check-action@v2
+      # 4. Run OWASP Dependency Check
+      - name: Run Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
         with:
-          scan-path: .
-          format: 'ALL'         # Generate HTML, XML, CSV reports
-          project: 'java-microservice-vuln'
-          fail-on-error: true   # Fail workflow if critical vulnerabilities are found
+          project: 'simple-java-microservice'
+          path: '.'
+          format: 'HTML'
+          out: 'dependency-check-reports'
 
-      # Step 5: Upload Security Report as Artifact
-      - name: Upload Dependency Check Report
-        uses: actions/upload-artifact@v3
+      # 5. Upload the vulnerability report
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
-          path: dependency-check-report.html
+          name: depcheck-report
+          path: dependency-check-reports
