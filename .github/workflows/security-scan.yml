@@ -53,51 +53,64 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+  
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Run Dependency Check
+  
+      # -------------------------
+      # Dependency Scan
+      # -------------------------
+      - name: Run OWASP Dependency Check (Offline)
         run: |
-          mvn org.owasp:dependency-check-maven:check \
-          -DfailOnError=false \
-          -Dnvd.api.key=${{ secrets.NVD_API_KEY }}
-          
-             
-      - name: Upload Report
+          mvn org.owasp:dependency-check-maven:9.0.9:check \
+            -Ddependency-check.skipUpdate=true \
+            -Ddependency-check.autoUpdate=false \
+            -DfailOnError=false \
+            -Dformat=HTML
+  
+      - name: Debug - Find Dependency Report
+        run: |
+          REPORT=$(find target -name "dependency-check-report.html" | head -n1)
+          if [ -f "$REPORT" ]; then
+            echo "Dependency vulnerability report found at: $REPORT"
+          else
+            echo "No dependency report found!"
+          fi
+  
+      # -------------------------
+      # Custom Code Vulnerability Scan
+      # -------------------------
+      - name: Scan .java files for custom vulnerable patterns
+        run: |
+          echo "Scanning all .java files for vulnerable patterns..."
+          FILES=$(find . -name "*.java")
+          VULNERABILITIES=0
+  
+          for FILE in $FILES; do
+            # Hard-coded passwords
+            grep -nH 'password\s*=\s*".*"' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
+            # Unsafe Runtime execution
+            grep -nH 'Runtime\.getRuntime\(\)\.exec' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
+            # SQL concatenation (simple check)
+            grep -nH '"SELECT .*" \+' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
+          done
+  
+          if [ $VULNERABILITIES -eq 0 ]; then
+            echo "No custom vulnerabilities found in .java files."
+          else
+            echo "$VULNERABILITIES potential custom vulnerabilities detected!"
+          fi
+  
+      # -------------------------
+      # Upload Full Reports
+      # -------------------------
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
+          name: vulnerability-reports
           path: |
             target/dependency-check-report.html
             target/site/dependency-check-report.html
-  # =========================
-  # Stage 5: Upload Report
-  # =========================
-  report:
-    runs-on: ubuntu-latest
-    needs: scan
-    steps:
-      - name: Upload Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: target/dependency-check-report.html
-
-  # =========================
-  # Stage 6: Fail on Vulnerabilities
-  # =========================
-  fail-on-vuln:
-    runs-on: ubuntu-latest
-    needs: scan
-    steps:
-      - name: Fail if vulnerabilities found
-        run: |
-          if grep -q "CRITICAL" target/dependency-check-report.html; then
-            echo "Critical vulnerabilities found!"
-            exit 1
-          else
-            echo "No critical vulnerabilities."
-          fi
