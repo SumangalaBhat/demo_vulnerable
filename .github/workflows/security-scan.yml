@@ -59,12 +59,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Run OWASP Dependency Check
+      - name: Run Dependency Check
         run: |
-          mvn org.owasp:dependency-check-maven:9.0.9:check \
-          -Ddependency-check.skipUpdate=true \
+          mvn org.owasp:dependency-check-maven:check \
           -DfailOnError=false \
-          -Dformat=HTML
+          -Dnvd.api.key=${{ secrets.NVD_API_KEY }}
       
       - name: Upload Report
         uses: actions/upload-artifact@v4
