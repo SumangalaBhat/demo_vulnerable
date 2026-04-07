@@ -53,23 +53,26 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+  
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Run OWASP Dependency Check (Offline)
+  
+      - name: Check NVD API Key
+        run: |
+          if [ -z "${{ secrets.NVD_API_KEY }}" ]; then
+            echo "ERROR: NVD API key is missing"
+            exit 1
+          fi
+  
+      - name: Run OWASP Dependency Check (Online with API key)
         run: |
           mvn org.owasp:dependency-check-maven:9.0.9:check \
-            -f ./pom.xml \
-            -Ddependency-check.skipUpdate=true \
-            -Ddependency-check.autoUpdate=false \
-            -DfailOnError=false \
-            -Dformat=HTML
-
-      - name: Debug - Find Report
-        run: find . -name "dependency-check-report.html"
+            -Dnvd.api.key=${{ secrets.NVD_API_KEY }} \
+            -Dformat=HTML \
+            -DfailOnError=false
 
   # =========================
   # Stage 5: Upload Report
