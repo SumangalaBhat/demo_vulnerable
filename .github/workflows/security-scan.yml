@@ -1,4 +1,4 @@
-name: Java Microservice Security Scan (Fixed JAVA_HOME)
+name: Java Microservice Security Scan (No Docker)
 
 on:
   push:
@@ -8,12 +8,18 @@ on:
 
 jobs:
 
+  # =========================
+  # Stage 1: Checkout
+  # =========================
   checkout:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
+  # =========================
+  # Stage 2: Setup Java
+  # =========================
   setup-java:
     runs-on: ubuntu-latest
     needs: checkout
@@ -26,45 +32,64 @@ jobs:
       - name: Verify Java
         run: java -version
 
+  # =========================
+  # Stage 3: Build
+  # =========================
   build:
     runs-on: ubuntu-latest
     needs: setup-java
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      - name: Build with Maven
+      - name: Build Project
         run: mvn clean install -B
-      - name: Show Build Output
-        run: ls -l target/
 
+  # =========================
+  # Stage 4: Vulnerability Scan
+  # =========================
   scan:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'simple-java-microservice'
-          path: '.'
-          format: 'HTML'
-          out: 'dependency-check-reports'
-          docker: false   # RUNS USING HOST JAVA, FIXES JAVA_HOME ERROR
-      - name: List Scan Reports
-        run: ls -l dependency-check-reports
 
+      - name: Run OWASP Dependency Check via Maven
+        run: mvn org.owasp:dependency-check-maven:check
+
+      - name: List Reports
+        run: ls -l target/
+
+  # =========================
+  # Stage 5: Upload Report
+  # =========================
   report:
     runs-on: ubuntu-latest
     needs: scan
     steps:
-      - name: Upload Vulnerability Report
+      - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
-          name: depcheck-report
-          path: dependency-check-reports
+          name: dependency-check-report
+          path: target/dependency-check-report.html
+
+  # =========================
+  # Stage 6: Fail on Vulnerabilities
+  # =========================
+  fail-on-vuln:
+    runs-on: ubuntu-latest
+    needs: scan
+    steps:
+      - name: Fail if vulnerabilities found
+        run: |
+          if grep -q "CRITICAL" target/dependency-check-report.html; then
+            echo "Critical vulnerabilities found!"
+            exit 1
+          else
+            echo "No critical vulnerabilities."
+          fi
