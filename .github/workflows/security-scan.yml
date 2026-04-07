@@ -1,4 +1,4 @@
-name: Java Microservice Security Scan (No Docker)
+name: Java Microservice DevSecOps Pipeline
 
 on:
   push:
@@ -9,12 +9,12 @@ on:
 jobs:
 
   # =========================
-  # Stage 1: Checkout
+  # Stage 1: Checkout Code
   # =========================
   checkout:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
   # =========================
@@ -24,16 +24,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: checkout
     steps:
-      - name: Set up Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Verify Java
         run: java -version
 
   # =========================
-  # Stage 3: Build
+  # Stage 3: Build Project
   # =========================
   build:
     runs-on: ubuntu-latest
@@ -41,76 +42,97 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       - name: Build Project
-        run: mvn clean install -B
+        run: |
+          echo "Building project..."
+          mvn clean install -DskipTests
+          echo "Build completed."
 
   # =========================
-  # Stage 4: Vulnerability Scan
+  # Stage 4: Dependency Vulnerability Scan (Offline)
   # =========================
-  scan:
+  dependency-scan:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-  
-      - name: Set up Java
+
+      - name: Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '17'
-  
-      # -------------------------
-      # Dependency Scan
-      # -------------------------
+
       - name: Run OWASP Dependency Check (Offline)
         run: |
+          echo "Running Dependency Check..."
+          mkdir -p target/dependency-check-report
           mvn org.owasp:dependency-check-maven:9.0.9:check \
             -Ddependency-check.skipUpdate=true \
             -Ddependency-check.autoUpdate=false \
             -DfailOnError=false \
-            -Dformat=HTML
-  
-      - name: Debug - Find Dependency Report
+            -Dformat=HTML \
+            -DoutputDirectory=target/dependency-check-report
+
+      - name: Debug - Dependency Report
         run: |
-          REPORT=$(find target -name "dependency-check-report.html" | head -n1)
+          REPORT=$(find target/dependency-check-report -name "dependency-check-report.html" | head -n1)
           if [ -f "$REPORT" ]; then
             echo "Dependency vulnerability report found at: $REPORT"
+            echo "Preview first 20 lines:"
+            head -n 20 "$REPORT"
           else
             echo "No dependency report found!"
           fi
-  
-      # -------------------------
-      # Custom Code Vulnerability Scan
-      # -------------------------
-      - name: Scan .java files for custom vulnerable patterns
+
+  # =========================
+  # Stage 5: Custom Code Vulnerability Scan
+  # =========================
+  custom-scan:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Scan Java files for custom vulnerabilities
         run: |
-          echo "Scanning all .java files for vulnerable patterns..."
-          FILES=$(find . -name "*.java")
+          echo "Scanning all .java files for custom vulnerabilities..."
+          FILES=$(find src/main/java -name "*.java")
           VULNERABILITIES=0
-  
+
           for FILE in $FILES; do
             # Hard-coded passwords
             grep -nH 'password\s*=\s*".*"' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
+            # Hard-coded API keys
+            grep -nH 'API_KEY\s*=\s*".*"' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
             # Unsafe Runtime execution
             grep -nH 'Runtime\.getRuntime\(\)\.exec' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
-            # SQL concatenation (simple check)
+            # SQL concatenation
             grep -nH '"SELECT .*" \+' "$FILE" && VULNERABILITIES=$((VULNERABILITIES+1))
           done
-  
+
           if [ $VULNERABILITIES -eq 0 ]; then
-            echo "No custom vulnerabilities found in .java files."
+            echo "✅ No custom vulnerabilities found in .java files."
           else
-            echo "$VULNERABILITIES potential custom vulnerabilities detected!"
-          fi
-  
-      # -------------------------
-      # Upload Full Reports
-      # -------------------------
-      - name: Upload Reports
+            echo "⚠️ $VULNERABILITIES potential custom vulnerabilities detected!"
+
+  # =========================
+  # Stage 6: Upload Reports
+  # =========================
+  upload-reports:
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, custom-scan]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Upload Dependency Check Report
         uses: actions/upload-artifact@v4
         with:
           name: vulnerability-reports
           path: |
-            target/dependency-check-report.html
+            target/dependency-check-report/dependency-check-report.html
             target/site/dependency-check-report.html
